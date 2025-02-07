@@ -4,21 +4,27 @@ from azure.core.exceptions import HttpResponseError
 import pandas as pd
 from datetime import datetime
 import pyodbc
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import urllib
+import os
+from dotenv import load_dotenv
+import time
+
+load_dotenv()
 
 class PurviewConfig:
     """Configuration class for Azure Purview authentication and endpoints.
+
     
     Stores the necessary credentials and endpoints for connecting to Azure Purview,
     including tenant ID, client ID, client secret, and Purview endpoints.
     """
     def __init__(self):
-        self.tenant_id = "Azure TENANT ID"
-        self.client_id = "Azure CLIENT ID"
-        self.client_secret = "Azure CLIENT SECRET"
-        self.purview_endpoint = "https://"+ "purview_account_name" + ".purview.azure.com/"
-        self.purview_scan_endpoint = "https://"+ "purview_account_name" +".purview.azure.com/"
+        self.tenant_id = os.getenv("TENANT_ID")
+        self.client_id = os.getenv("CLIENT_ID")
+        self.client_secret = os.getenv("CLIENT_SECRET")
+        self.purview_endpoint = os.getenv("PURVIEW_ENDPOINT")
+        self.purview_scan_endpoint = os.getenv("PURVIEW_SCAN_ENDPOINT")
 
 class DatabaseConfig:
     """Configuration class for Azure SQL Database connection settings.
@@ -27,12 +33,14 @@ class DatabaseConfig:
     including server name, database name, authentication credentials, and target table.
     """
     def __init__(self):
-        self.server = 'Azure SQL SERVER NAME'
-        self.database = 'Azure SQL DATABASE NAME'
-        self.username = 'Azure SQL USERNAME'
-        self.password = 'Azure SQL PASSWORD'
+        self.server = os.getenv("DB_SERVER")
+        self.database = os.getenv("DB_NAME")
+        self.username = os.getenv("DB_USERNAME")
+        self.password = os.getenv("DB_PASSWORD")
         self.driver = 'ODBC Driver 17 for SQL Server'
-        self.table_name = 'Azure SQL TABLE NAME'
+        self.table_name = os.getenv("DB_TABLE_NAME")
+
+
 
 class PurviewSearchClient:
     """Client for performing searches in Azure Purview.
@@ -127,7 +135,8 @@ class DataExporter:
     def __init__(self, db_config: DatabaseConfig):
         self.db_config = db_config
         self.engine = self._create_engine()
-    
+
+   
     def _create_engine(self):
         """Create SQLAlchemy engine for database operations.
         
@@ -140,7 +149,23 @@ class DataExporter:
             f"?driver={self.db_config.driver.replace(' ', '+')}"
         )
         return create_engine(connection_string)
-    
+
+    def ping_database(self):
+        """Ping the database to test connection.
+        
+        Returns:
+            bool: True if connection successful, False otherwise.
+        """
+        try:
+            with self.engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+                connection.commit()
+            print("Database connection test successful")
+            return True
+        except Exception as e:
+            print(f"Database connection test failed: {e}")
+            return False
+
     def export_to_sql(self, df, table_name=None):
         """Export DataFrame to Azure SQL Database.
         
@@ -188,8 +213,13 @@ def main():
         jdf = pd.json_normalize(search_results.value)
         jdf['date'] = datetime.now().date()
         
-        # Export to SQL
-        data_exporter.export_to_sql(jdf)
+         # Ping database and wait before export
+        if data_exporter.ping_database():
+            time.sleep(30)  # Wait 30 seconds
+            # Export to SQL
+            data_exporter.export_to_sql(jdf)
+        else:
+            print("Skipping export due to failed database connection test")
 
 if __name__ == "__main__":
     main()
