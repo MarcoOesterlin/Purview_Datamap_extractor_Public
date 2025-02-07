@@ -17,9 +17,8 @@ class PurviewConfig:
         self.tenant_id = "Azure TENANT ID"
         self.client_id = "Azure CLIENT ID"
         self.client_secret = "Azure CLIENT SECRET"
-        self.purview_endpoint = "https://"+ purview_account_name + ".purview.azure.com/"
-        self.purview_scan_endpoint = "https://"+ purview_account_name +".purview.azure.com/"
-
+        self.purview_endpoint = "https://"+ "purview_account_name" + ".purview.azure.com/"
+        self.purview_scan_endpoint = "https://"+ "purview_account_name" +".purview.azure.com/"
 
 class DatabaseConfig:
     """Configuration class for Azure SQL Database connection settings.
