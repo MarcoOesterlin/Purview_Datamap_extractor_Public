@@ -7,11 +7,11 @@ A Python-based tool for extracting metadata from Azure Purview and exporting it 
 
 ## 🌟 Features
 
-- Automated Azure Purview catalog search
-- Paginated data retrieval
-- Structured data processing
-- Direct export to Azure SQL Database
-- Error handling and logging
+- Azure Purview catalog search with pagination
+- Data processing and SQL Database export
+- Database connection testing with 30s stability delay
+- Environment variable configuration
+- Azure DevOps pipeline support
 
 ## 📋 Prerequisites
 
@@ -20,10 +20,10 @@ A Python-based tool for extracting metadata from Azure Purview and exporting it 
 - ODBC Driver 17 for SQL Server
 
 ### Azure Resources
-- Active Azure subscription
-- Azure Purview account
-- Azure SQL Database
-- Service Principal with appropriate permissions
+  - Purview account
+  - SQL Database
+  - Service Principal
+  - (Optional) Azure DevOps project
 
 ### Python Dependencies
 pip install azure-purview-catalog azure-identity azure-core pandas pyodbc sqlalchemy urllib3
