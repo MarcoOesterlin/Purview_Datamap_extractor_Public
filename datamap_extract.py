@@ -150,21 +150,32 @@ class DataExporter:
         )
         return create_engine(connection_string)
 
+
     def ping_database(self):
-        """Ping the database to test connection.
-        
-        Returns:
-            bool: True if connection successful, False otherwise.
-        """
+
         try:
-            with self.engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
-                connection.commit()
+            # Create a new connection string for testing
+            conn_str = (
+                f'DRIVER={{{self.db_config.driver}}};'
+                f'SERVER={self.db_config.server};'
+                f'DATABASE={self.db_config.database};'
+                f'UID={self.db_config.username};'
+                f'PWD={self.db_config.password}'
+            )
+            
+            # Try to establish connection using pyodbc
+            conn = pyodbc.connect(conn_str)
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+            conn.close()
             print("Database connection test successful")
             return True
+            
         except Exception as e:
             print(f"Database connection test failed: {e}")
             return False
+
 
     def export_to_sql(self, df, table_name=None):
         """Export DataFrame to Azure SQL Database.
@@ -213,9 +224,25 @@ def main():
         jdf = pd.json_normalize(search_results.value)
         jdf['date'] = datetime.now().date()
         
-         # Ping database and wait before export
+        # Convert all dictionary/object columns to strings
+        for column in jdf.columns:
+            if jdf[column].dtype == 'object':
+                jdf[column] = jdf[column].apply(lambda x: str(x) if isinstance(x, (dict, list)) else x)
+
+
+        explode_columns = ['assetType', 'contact', 'classification', 'endorsement', 'tag', 'term']
+        
+        for column in explode_columns:
+            jdf = jdf.explode([column]).reset_index(drop=True)
+
+        # Convert any remaining complex types after exploding
+        for column in jdf.columns:
+            if jdf[column].dtype == 'object':
+                jdf[column] = jdf[column].apply(lambda x: str(x) if isinstance(x, (dict, list)) else x)
+
+        # Ping database and wait before export
         if data_exporter.ping_database():
-            time.sleep(30)  # Wait 30 seconds
+            time.sleep(120)  # Wait 30 seconds
             # Export to SQL
             data_exporter.export_to_sql(jdf)
         else:
