@@ -151,30 +151,41 @@ class DataExporter:
         return create_engine(connection_string)
 
 
-    def ping_database(self):
-
-        try:
-            # Create a new connection string for testing
-            conn_str = (
-                f'DRIVER={{{self.db_config.driver}}};'
-                f'SERVER={self.db_config.server};'
-                f'DATABASE={self.db_config.database};'
-                f'UID={self.db_config.username};'
-                f'PWD={self.db_config.password}'
-            )
+    def ping_database(self, max_retries=3, retry_delay=30):
+        """Test database connection with retry mechanism.
+        
+        Args:
+            max_retries (int): Maximum number of connection attempts
+            retry_delay (int): Delay in seconds between retries
             
-            # Try to establish connection using pyodbc
-            conn = pyodbc.connect(conn_str)
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            cursor.close()
-            conn.close()
-            print("Database connection test successful")
-            return True
-            
-        except Exception as e:
-            print(f"Database connection test failed: {e}")
-            return False
+        Returns:
+            bool: True if connection successful, False otherwise
+        """
+        for attempt in range(max_retries):
+            try:
+                conn_str = (
+                    f'DRIVER={{{self.db_config.driver}}};'
+                    f'SERVER={self.db_config.server};'
+                    f'DATABASE={self.db_config.database};'
+                    f'UID={self.db_config.username};'
+                    f'PWD={self.db_config.password}'
+                )
+                conn = pyodbc.connect(conn_str)
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+                cursor.close()
+                conn.close()
+                print("Database connection test successful")
+                return True
+                
+            except Exception as e:
+                print(f"Database connection attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:  # Don't sleep after last attempt
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                
+        print(f"Database connection failed after {max_retries} attempts")
+        return False
 
 
     def export_to_sql(self, df, table_name=None):
@@ -229,24 +240,14 @@ def main():
             if jdf[column].dtype == 'object':
                 jdf[column] = jdf[column].apply(lambda x: str(x) if isinstance(x, (dict, list)) else x)
 
-
-        explode_columns = ['assetType', 'contact', 'classification', 'endorsement', 'tag', 'term']
-        
-        for column in explode_columns:
-            jdf = jdf.explode([column]).reset_index(drop=True)
-
-        # Convert any remaining complex types after exploding
-        for column in jdf.columns:
-            if jdf[column].dtype == 'object':
-                jdf[column] = jdf[column].apply(lambda x: str(x) if isinstance(x, (dict, list)) else x)
-
-        # Ping database and wait before export
-        if data_exporter.ping_database():
-            time.sleep(120)  # Wait 30 seconds
+        # Try to connect to database with retries
+        if data_exporter.ping_database(max_retries=3, retry_delay=30):
+            print("Waiting 120 seconds before export...")
+            time.sleep(120)  # Wait 120 seconds
             # Export to SQL
             data_exporter.export_to_sql(jdf)
         else:
-            print("Skipping export due to failed database connection test")
+            print("Export aborted due to persistent database connection issues")
 
 if __name__ == "__main__":
     main()
