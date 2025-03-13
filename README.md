@@ -3,7 +3,7 @@
 
 # Azure Purview Data Extraction Tool
 
-A Python-based tool for extracting metadata from Azure Purview and exporting it to Azure SQL Database.
+A Python-based tool for extracting metadata from Azure Purview and exporting it to Azure SQL Database or Fabric Notebook
 
 ## 🌟 Features
 
